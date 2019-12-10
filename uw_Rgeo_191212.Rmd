@@ -1,0 +1,986 @@
+---
+title: "Progress in the R ecosystem for open source spatial analysis software"
+author: "Roger Bivand"
+date: "Thursday 12 December 2019, 16:45-18:45, sala 108"
+output: 
+  html_document:
+    toc: true
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+    toc_depth: 2
+theme: united
+bibliography: uw19.bib
+link-citations: yes
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Copyright
+
+All the material presented here, to the extent it is original, is available under [CC-BY-SA](https://creativecommons.org/licenses/by-sa/4.0/). Parts build on joint tutorials with Edzer Pebesma.
+
+### Required current contributed CRAN packages:
+
+I am running R 3.6.1, with recent `update.packages()`.
+
+```{r, echo=TRUE}
+needed <- c("raster", "rgdal", "RSQLite", "stars", "abind", "sp", "mapview",
+"sf", "osmdata", "wordcloud", "RColorBrewer")
+```
+
+### Script
+
+Script and data at https://github.com/rsbivand/uw_191212/raw/master/uw_Rgeo_191212.zip. Download to suitable location, unzip and use as basis.
+
+## Preface/positionality
+
+I am afraid that this talk will not contain many graphical elements. Why is this? Text is processed by different parts of our cognitive systems than images, which open for many more mis-understandings. Text is generally a more direct channel of communication.
+
+Code is privileged text, it shows what is happening explicitly. It facilitates the reproduction of the workflow, and enables clear checking of robustness. Literate programming, and its modern form as notebooks that can be executed to reproduce outcomes, may seem hard to digest, but they enable the reader to become a co-creator of content.
+
+It is a different kind of performance than a story, in that the reader may enter the workflow. In GUI-based stories, it is very possible that neither the author nor the reader can reconstruct the actual workflow yielding the presented outcomes.
+
+## Outline
+
+Introduction and background: why break stuff (why not)?
+
+Spatial data input/output and representation: movement from legacy **sp** to standards-compliant **sf** representation; coordinate reference systems; developments similar to `GeoPandas` and `Shapely` in Python
+
+Opportunities in visualization (**tmap**, **mapview**), but also challenges when upstream software libraries evolve (PROJ/GDAL)
+
+
+# R-Spatial: getting to here and now
+
+### Background
+
+In the early and mid 1990s, those of us who were teaching courses in spatial analysis beyond the direct application of geographical information systems (GIS) found the paucity of software limiting. 
+
+In institutions with funding for site licenses for GIS, it was possible to write or share scripts for Arc/Info (in AML), ArcView (in Avenue), or later in Visual Basic for ArcGIS. 
+
+If site licenses and associated dongles used in the field were a problem (including students involved in fieldwork in research projects), there were few alternatives, but opportunities were discussed on mailing lists. 
+
+From late 1996, the R programmimg language and environment began to be seen as an alternative for teaching and research involving spatial analysis. 
+
+R uses much of the syntax of S, then available commercially as S-Plus, but was and remains free to install, use and extend under the GNU General Public License (GPL). 
+
+In addition, it could be installed portably across multiple operating systems, including Windows and Apple MACOS. 
+
+At about the same time, the S-Plus SpatialStats module was published [@kaluznyetal:98], and a meeting occurred in Leicester to which many of those looking for solutions took part. 
+
+Much of the porting of S code to R for spatial statistics was begun by Albrecht Gebhardt as soon as the R package mechanism matured. Since teachers moving courses from S to R needed access to the S libraries previously used, porting was a crucial step. 
+
+CRAN listings show **tripack** [@tripack-package] and **akima** [@akima-package] - both with non-open source licenses - available from August 1998 ported by Albrecht Gebhardt; **ash** and **sgeostat** [@sgeostat-package] followed in April 1999. 
+
+The **spatial** package was available as part of **MASS** [@venables_modern_2002], also ported in part by Albrecht Gebhardt.
+
+In the earliest period, CRAN administrators helped practically with porting and publication. 
+
+Albrecht and I presented an overview of possibilities of usin R for research and teaching in spatial analysis and statistics in August 1998 [@Bivand2000].
+
+The S-PLUS version of **splancs** provided point pattern analysis  [@rowlingson+diggle:93; @splancs-package]. 
+
+I had contacted Barry Rowlingson in 1997 but only moved forward with porting as R's ability to load shared objects advanced. 
+
+In September 1998, I wrote to him: "It wasn't at all difficult to get things running, which I think is a result of your coding, thank you!" 
+
+However, I added this speculation: "An issue I have thought about a little is whether at some stage Albrecht and I wouldn't integrate or harmonize the points and pairs objects in **splancs**, **spatial** and **sgeostat** - they aren't the same, but for users maybe they ought to appear to be so". 
+
+This concern with class representations for geographical data turned out to be fruitful.
+
+A further step was to link GRASS and R [@bivand_using_2000], and followed up at several meetings and working closely with Markus Neteler. 
+
+The interface has evolved, and its almost current status is presented by [@geocompr], we return to the current status below. 
+
+A consequence of this work was that the CRAN team suggested that I attend a meeting in Vienna in early 2001 to talk about the GRASS GIS interface. 
+
+The meeting gave unique insights into the dynamics of R development, and very valuable contacts. 
+
+Later the same year Luc Anselin and Serge Rey asked me to take part in a workshop in Santa Barbara, which again led to many fruitful new contacts [@bivand:06]. 
+
+Further progress was made in spatial econometrics [@bivand:02].
+
+### 2003 Vienna workshop
+
+During the second half of 2002, it seemed relevant to propose a spatial statistics paper session at the next Vienna meeting to be held in March 2003, together with a workshop to discuss classes for spatial data. 
+
+I had reached out to Edzer Pebesma as an author of the stand-alone open source program `gstat` [@pebesma98]; it turned out that he had just been approached to wrap the program for S-Plus. 
+
+He saw the potential of the workshop immediately, and in November 2002 wrote in an email: "I wonder whether I should start writing S classes. I'm afraid I should." 
+
+Virgilio Gómez-Rubio had been developing two spatial packages, **RArcInfo** [@rarcinfo; @rarcinfo-package] and **DCluster** [@gomez-rubioetal05; @DCluster-package], and was committed to participating. 
+
+Although he could not get to the workshop, Nicholas Lewin-Koh wrote in March 2003 that: "I was looking over all the DSC material, especially the spatial stuff. I did notice, after looking through peoples' packages that there is a lot of duplication of effort. My suggestion is that we set up a repository for spatial packages similar to the Bioconductor mode, where we have a base spatial package that has S-4 based methods and classes that are efficient and general."
+
+Straight after the workshop, a collaborative repository for the development of software using SourceForge was established, and the R-sig-geo mailing list (still with over 3,500 subscribers) was created to facilitate interaction. 
+
+### Beginnings of **sp**
+
+So the mandate for the development of the **sp** package emerged in discussions between interested contributors before, during, and especially following the 2003 Vienna workshop. 
+
+Coding meetings were organized by Barry Rowlingson in Lancaster in November 2004 and by Virgilio Gómez-Rubio in Valencia in May 2005, at both of which the class definitions and implementations were stress-tested and often changed radically; the package was first published on CRAN in April 2005. 
+
+The underlying model adopted was for S4 (new-style) classes to be used, for `"Spatial"` objects, whether raster or vector, to behave like `"data.frame"` objects, and for visualization methods to make it easy to show the objects.
+
+### Relationships with other packages
+
+From an early point in time, object conversion (known as coercion in S and R) to and from **sp** classes and classes in for example the **spatstat** package [@baddeley+turner05; @baddeleyetal15; @spatstat-package]. 
+
+Packages could choose whether they would use **sp** classes and methods directly, or rather use those classes for functionality that they did not provide themselves through coercion.
+
+Reading and writing ESRI Shapefiles had been possible using the **maptools** package [@maptools-package] available from CRAN since August 2003, but **rgdal**, on CRAN from November 2003, initially only supported raster data read and written using the external GDAL library [@gdal]. 
+
+Further code contributions by Barry Rowlingson for handling projections using the external PROJ.4 library and the vector drivers in the then OGR part of GDAL were folded into **rgdal**, permitting reading into **sp**-objects and writing from **sp**-objects of vector and raster data. 
+
+### Completing the **sp**-verse
+
+For vector data it became possible to project coordinates, and in addition to transform them where datum specifications were available. 
+
+Until recently, the interfaces to external libraries GDAL and PROJ have been relatively stable, and upstream changes have not led to breaking changes for users of packages using **sp** classes or **rgdal** functionalities, although they have involved significant maintenance effort. 
+
+The final part of the framework for spatial vector data handling was the addition of the **rgeos** package interfacing the external GEOS library in 2011, thanks to Colin Rundell's 2010 Google Summer of Coding project. 
+
+The **rgeos** package provided vector topological predicates and operations typically found in GIS such as intersection; note that by this time, both GDAL and GEOS used the Simple Features vector representation internally.
+
+### Applied Spatial Data Analysis with R (ASDAR, Springer: useR! series)
+
+By the publication of ASDAR [@asdar1], a few packages not written or maintained by the book authors and their nearest collaborators had begun to use **sp** classes. By the publication of the second edition [@asdar2], we had seen that the number of packages depending on **sp**, importing from and suggesting it (in CRAN terminology for levels of dependency) had grown strongly. In late 2014, [@de-vries14] looked at CRAN package clusters from a page rank graph, and found a clear spatial cluster that we had not expected. This cluster is from earlier this week:
+
+```{r, echo = FALSE, eval=FALSE} 
+BCrepos <- BiocManager::repositories()
+bioc <- available.packages(repo = BCrepos[1])
+bioc_ann <- available.packages(repo = BCrepos[2])
+bioc_exp <- available.packages(repo = BCrepos[3])
+cran <- available.packages()
+saveRDS(cran, file="cran_191209.rds")
+pdb <- rbind(cran, bioc, bioc_ann, bioc_exp)
+saveRDS(pdb, file="pdb_191209.rds")
+```
+
+
+```{r, echo = FALSE, eval=FALSE} 
+pdb <- readRDS("pdb_191209.rds")
+suppressPackageStartupMessages(library(miniCRAN))
+suppressPackageStartupMessages(library(igraph))
+suppressPackageStartupMessages(library(magrittr))
+pg <- makeDepGraph(pdb[, "Package"], availPkgs = pdb, suggests=TRUE, enhances=TRUE, includeBasePkgs = FALSE)
+pr <- pg %>%
+  page.rank(directed = FALSE) %>%
+  use_series("vector") %>%
+  sort(decreasing = TRUE) %>%
+  as.matrix %>%
+  set_colnames("page.rank")
+  cutoff <- quantile(pr[, "page.rank"], probs = 0.2)
+popular <- pr[pr[, "page.rank"] >= cutoff, ]
+toKeep <- names(popular)
+vids <- V(pg)[toKeep]
+gs <- induced.subgraph(pg, vids = toKeep)
+cl <- walktrap.community(gs, steps = 3)
+topClusters <- table(cl$membership) %>%
+  sort(decreasing = TRUE) %>%
+  head(25)
+cluster <- function(i, clusters, pagerank, n=10){
+  group <- clusters$names[clusters$membership == i]
+  pagerank[group, ] %>% sort(decreasing = TRUE) %>% head(n)
+}
+z <- lapply(names(topClusters)[1:15], cluster, clusters=cl, pagerank=pr, n=40)
+saveRDS(z, file="all_z_191209.rds")
+```
+
+```{r plot4a, cache=TRUE, echo=FALSE, eval=TRUE}
+suppressPackageStartupMessages(library(wordcloud))
+z <- readRDS("all_z_191209.rds")
+oopar <- par(mar=c(0,0,0,0)+0.1)
+wordcloud(names(z[[4]]), freq=unname(z[[4]])) # sf 2 sp 4
+par(oopar)
+```
+
+# Spatial data
+
+Spatial data typically combine position data in 2D (or 3D), attribute data and metadata related to the position data. Much spatial data could be called map data or GIS data. We collect and handle much more position data since global navigation satellite systems (GNSS) like GPS came on stream 20 years ago, earth observation satellites have been providing data for longer.
+
+When we began, most vector data had been digitised manually, with manual punching of attribute data, or was shared as downloaded files often as ESRI Shapefiles, the format introduced with ArcView. Nowadays, much data is available from online cloud sources, for example Open Street Map, here used to extract the light rail system in Bergen using the **osmdata** package. Setting up an Area of Interest (AoI), we query the data source for key values with two qualifications (those uploading the data were not consistent). These are then merged to give a single data object:
+
+```{r, echo = TRUE}
+suppressPackageStartupMessages(library(osmdata))
+library(sf)
+```
+
+```{r, cache=TRUE, echo = TRUE, eval=FALSE}
+bbox <- opq(bbox = 'bergen norway')
+byb0 <- osmdata_sf(add_osm_feature(bbox, key = 'railway',
+  value = 'light_rail'))$osm_lines
+tram <- osmdata_sf(add_osm_feature(bbox, key = 'railway',
+  value = 'tram'))$osm_lines
+byb1 <- tram[!is.na(tram$name),]
+o <- intersect(names(byb0), names(byb1))
+byb <- rbind(byb0[,o], byb1[,o])
+saveRDS(byb, file="byb.rds")
+```
+```{r, echo=FALSE, eval=TRUE}
+byb <- readRDS("byb.rds")
+```
+
+Spatial vector data is based on points, from which other geometries are constructed. Vector data is often also termed object-based spatial data. The light rail tracks are 2D vector data. The points themselves are stored as double precision floating point numbers, typically without recorded measures of accuracy (GNSS provides a measure of accuracy). Here, lines are constructed from points.
+
+It has also become typical over the past few years to show such data objects in a pan/zoom interactive setting, here with  the **mapview** package:
+
+
+```{r, echo = TRUE}
+library(mapview)
+mapview(byb)
+```
+
+### Data handling
+
+We can download monthly CSV files of [city bike](https://bergenbysykkel.no/en/open-data) use, and manipulate the input to let us use the **stplanr** package to aggregate origin-destination data. One destination is in Oslo, some are round trips, but otherwise things are OK. 
+
+```{r, echo = TRUE, eval=FALSE, cache=TRUE}
+bike_fls <- list.files("bbs")
+trips0 <- NULL
+for (fl in bike_fls) trips0 <- rbind(trips0,
+  read.csv(file.path("bbs", fl), header=TRUE))
+trips0 <- trips0[trips0[, 8] < 6 & trips0[, 13] < 6,]
+trips <- cbind(trips0[,c(1, 4, 2, 9)], data.frame(count=1))
+from <- unique(trips0[,c(4,5,7,8)])
+names(from) <- substring(names(from), 7)
+to <- unique(trips0[,c(9,10,12,13)])
+names(to) <- substring(names(to), 5)
+```
+
+```{r, echo = TRUE, eval=FALSE, cache=TRUE}
+# find origins and destinations and merge them
+stations0 <- st_as_sf(merge(from, to, all=TRUE),
+  coords=c("station_longitude", "station_latitude"))
+stations <- aggregate(stations0, list(stations0$station_id),
+  head, n=1)
+suppressWarnings(stations <- st_cast(stations, "POINT"))
+st_crs(stations) <- 4326
+```
+
+```{r, echo = TRUE, eval=FALSE, cache=TRUE}
+# sum trips between origins and destinations
+od <- aggregate(trips[,-(1:4)], list(trips$start_station_id,
+  trips$end_station_id), sum)
+```
+
+We can use the **stplanr** package to generate the station-to-station desire lines between different stations, omitting bikes dropped at the same station where they were picked up:
+
+```{r, echo = TRUE, eval=FALSE, cache=TRUE}
+# drop equal origins and destinations
+od <- od[-(which(od[,1] == od[,2])),]
+# create desire lines
+library(stplanr)
+od_lines <- od2line(flow=od, zones=stations, zone_code="Group.1",
+  origin_code="Group.1", dest_code="Group.2")
+saveRDS(od_lines, "od_lines.rds")
+```
+
+Origin-destination lines
+
+```{r plot3, cache=TRUE, eval=TRUE}
+od_lines <- readRDS("od_lines.rds")
+mapview(od_lines, alpha=0.2, lwd=(od_lines$x/max(od_lines$x))*10)
+```
+
+We can use [CycleStreets](www.cyclestreets.net) to route the volumes onto [OSM](https://www.openstreetmap.org/copyright) cycle paths, via an API and API key. 
+```{r, echo = TRUE, eval=FALSE, cache=TRUE}
+# allocate desirelines to cycle paths using CycleStreet
+Sys.setenv(CYCLESTREET="XxXxXxXxXxXxXxXx")
+od_routes <- line2route(od_lines, "route_cyclestreet",
+  plan = "fastest")
+saveRDS(od_routes, "od_routes.rds")
+```
+
+Routed lines along cycle routes
+
+```{r plot4, cache=TRUE, eval=TRUE}
+od_routes <- readRDS("od_routes.rds")
+mapview(od_routes, alpha=0.2, lwd=(od_lines$x/max(od_lines$x))*10)
+```
+
+We'd still need to aggregate the bike traffic by cycle path segment for completeness,
+
+## Advancing from the **sp** representation
+
+### Representing spatial vector data in R (**sp**)
+
+
+The **sp** package was a child of its time, using S4 formal classes, and the best compromise we then had of positional representation (not arc-node, but hard to handle holes in polygons). If we coerse `byb` to the **sp** representation, we see the formal class structure. Input/output used OGR/GDAL vector drivers in the **rgdal** package, and topological operations used GEOS in the **rgeos** package.
+
+
+```{r, echo = TRUE}
+library(sp)
+byb_sp <- as(byb, "Spatial")
+str(byb_sp, max.level=2)
+```
+
+```{r, echo = TRUE}
+str(slot(byb_sp, "lines")[[1]])
+```
+
+### Raster data
+
+Spatial raster data is observed using rectangular (often square) cells, within which attribute data are observed. Raster data are very rarely object-based, very often they are field-based and could have been observed everywhere. We probably do not know where within the raster cell the observed value is correct; all we know is that at the chosen resolution, this is the value representing the whole cell area.
+
+Elevation data may be accessed from the AWS cloud using the **elevatr** package:
+
+```{r, echo = TRUE, eval=FALSE}
+library(elevatr)
+elevation <- get_elev_raster(byb_sp, z = 10)
+is.na(elevation) <- elevation < 1
+saveRDS(elevation, file="elevation.rds")
+```
+
+The native import format is that of the **raster** package building on **sp**:
+
+```{r, echo = TRUE}
+elevation <- readRDS("elevation.rds")
+str(elevation, max.level=2)
+```
+
+The **sp** representation is:
+
+```{r, echo=TRUE}
+str(as(elevation, "SpatialGridDataFrame"), max.level=2)
+```
+
+and the mapped values:
+
+```{r, echo = TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+mapview(elevation, col=terrain.colors)
+```
+
+
+### Raster data
+
+The **raster** package complemented **sp** for handling raster objects and their interactions with vector objects. 
+
+It added to input/output using GDAL through **rgdal**, and better access to NetCDF files for GDAL built without the relevant drivers. 
+
+It may be mentioned in passing that thanks to help from CRAN administrators and especially Brian Ripley, CRAN binary builds of **rgdal** for Windows and Apple Mac OSX became available from 2006, but with a limited set of vector and raster drivers. 
+
+Support from CRAN adminstrators remains central to making packages available to users who are not able to install R source packages themselves, particularly linking to external libraries. 
+
+Initially, **raster** was written in R using functionalities in **sp** and **rgdal** with **rgeos** coming later. 
+
+It used a feature of GDAL raster drivers permitting the successive reading of subsets of rasters by row and column, permitting the processing of much larger objects than could be held in memory. 
+
+In addition, the concepts of bricks and stacks of rasters were introduced, diverging somewhat from the **sp** treatment of raster bands as stacked columns as vectors in a data frame.
+
+### Questions arose
+
+As **raster** evolved, two other packages emerged raising issues with the ways in which spatial objects had been conceptualized in **sp**. 
+
+The **rgeos** package used the C application programming interface (API) to the C++ GEOS library, which is itself a translation of the Java Topology Suite (JTS). 
+
+While the GDAL vector drivers did use the standard Simple Features representation of ector geometries, it was not strongly enforced. 
+
+This laxity now seems most closely associated with the use of ESRI Shapefiles as a de-facto file standard for representation, in which many Simple Features are not consistently representable. 
+
+### Need for vector standards compliance
+
+Both JTS and GEOS required a Simple Feature compliant representation, and led to the need for curious and fragile adaptations. 
+
+For example, these affected the representation of **sp** `"Polygons"` objects, which were originally conceptualized after the Shapefile specification: ring direction determined whether a ring was exterior or interior (a hole), but no guidance was given to show which exterior ring holes might belong to. 
+
+As R provides a way to add a character string comment to any object, comments were added to each `"Polygons"` object encoding the necessary information. 
+
+In this way, GEOS functionality could be used, but the fragility of vector representation in **sp** was made very obvious.
+
+### Spatio-temporal data
+
+Another package affecting thinking about representation was **spacetime**, as it diverged from **raster** by stacking vectors for regular spatio-temporal objects with space varying faster than time. 
+
+So a single earth observation band observed repeatedly would be stored in a single vector in a data frame, rather than in the arguably more robust form of a four-dimensional array, with the band taking one position on the final dimension. 
+
+The second edition of [@asdar2] took up all of these issues in one way or another, but after completing a spatial statistics special issue of the Journal of Statistical Software [@JSSv063i01], it was time to begin fresh implementations of classes for spatial data.
+
+## Simple Features in R
+
+
+It was clear that vector representations needed urgent attention, so the **sf** package was begun, aiming to implement the most frequently used parts of the specification [@iso19125; @kralidis08; @sfa]. 
+
+Development was supported by a grant from the then newly started R Consortium, which brings together R developers and industry members. 
+
+However, although data frame objects in S and R have always been able to take list columns as valid columns, such list columns were not seen as "tidy" [@JSSv059i10].
+
+A key breakthrough came at the useR! 2016 conference, following an earlier decision to re-base vector objects on data frames, rather than as in **sp** to embed a data frame inside a collection of spatial features of the same kind. 
+
+
+### **sf** begins
+
+[@RJ-2018-009] shows the status of the **sf** towards the end of 2017, with a geometry list column containing R wrappers around objects adhering to Simple Features specification definitions. The feature geometries are stored in numeric vectors, matrices, or lists of matrices, and may also be subject to arithmetic operations. Features are held in the `"XY"` class if two-dimensional, or `"XYZ"`, `"XYM"` or `"XYZM"` if such coordinates are available; all single features are `"sfg"` (Simple Feature geometry) objects: 
+
+```{r, echo = TRUE} 
+pt1 <- st_point(c(1,3))
+pt2 <- pt1 + 1
+pt3 <- pt2 + 1
+str(pt3)
+```
+
+Geometries may be represented as "Well Known Text" (WKT):
+
+
+```{r, echo = TRUE} 
+st_as_text(pt3)
+```
+
+or as "Well Known Binary" (WKB) as in databases' "binary large objects" (BLOBs), resolving the problem of representation when working with GDAL vector drivers and functions, and with GEOS predicates and topological operations:
+
+
+```{r, echo = TRUE} 
+st_as_binary(pt3)
+```
+
+A column of simple feature geometries (`"sfc"`) is constructed as a list of `"sfg"` objects, which do not have to belong to the same Simple Features category: 
+
+```{r, echo = TRUE} 
+pt_sfc <- st_as_sfc(list(pt1, pt2, pt3))
+str(pt_sfc)
+```
+
+Finally, an `"sfc"` object, a geometry column, can be added to a `data.frame` object using `st_geometry()`, which sets a number of attributes on the object and defines it as also being an `"sf"` object (the `"agg"` attribute if populated shows how observations on non-geometry columns should be understood):
+
+Data frames are lists of vector components:
+
+
+```{r , echo = TRUE}
+V1 <- 1:3
+V2 <- letters[1:3]
+V3 <- sqrt(V1)
+V4 <- sqrt(as.complex(-V1))
+L <- list(v1=V1, v2=V2, v3=V3, v4=V4)
+```
+
+Let's create a data frame from this list, ending up with strings not treated as categorical variables:
+
+```{r , echo = TRUE}
+DF <- as.data.frame(L)
+str(DF)
+DF <- as.data.frame(L, stringsAsFactors=FALSE)
+str(DF)
+```
+
+
+### Tidy list columns
+
+Data frame list columns have existed for a long time:
+
+
+```{r, echo = TRUE} 
+DF$E <- list(d=1, e="1", f=TRUE)
+str(DF)
+```
+
+At useR! in 2016, list columns were declared "tidy", using examples including the difficulty of encoding polygon interior rings in non-list columns. The decision to accommodate "tidy" workflows as well as base-R workflows had already been made, as at least some users only know how to use so-called ``tidy'' workflows. We add the `"sfc"` object to the data frame assigning through `st_geometry()`:
+
+
+```{r, echo = TRUE} 
+st_geometry(DF) <- pt_sfc
+(DF)
+```
+
+The **sf** package does not implement all of the Simple Features geometry categories, but geometries may be converted to the chosen subset, using for example the `gdal_utils()` function with `util="ogr2ogr", options="-nlt CONVERT_TO_LINEAR"` to convert curve geometries in an input file to linear geometries. 
+
+Many of the functions in the **sf** package begin with `st_` as a reference to the same usage in PostGIS, where the letters were intended to symbolise space and time, but where time has not yet been implemented.
+
+**sf** also integrates GEOS topological predicates and operations into the same framework, replacing the **rgeos** package for access to GEOS functionality. The precision and scale defaults differ between **sf** and **rgeos** slightly; both remain fragile with respect to invalid geometries, of which there are many in circulation.
+
+```{r, echo = TRUE} 
+(buf_DF <- st_buffer(DF, dist=0.3))
+```
+
+```{r, echo=TRUE}
+plot(st_geometry(buf_DF))
+plot(st_geometry(DF), add=TRUE)
+```
+
+
+
+## Raster representations: **stars**
+
+Like **sf**, **stars** was supported by an R Consortium grant, for scalable, spatio-temporal tidy arrays for R. 
+
+Spatio-temporal arrays were seen as an alternative way of representing multivariate spatio-temporal data from the choices made in the **spacetime** package, where a two-dimensional data frame contained stacked positions within stacked time points or intervals. 
+
+The proposed arrays might collapse to a raster layer if only one variable was chosen for one time point or interval. 
+
+More important, the development of the package was extended to accommodate a backend for earth data processing in which the data are retrieved and rescaled as needed from servers, most often cloud-based servers.
+
+
+This example only covers a multivariate raster taken from a Landsat 7 view of a small part of the Brazilian coast. In the first part, a GeoTIFF file is read into memory, using three array dimensions, two in planar space, the third across six bands:
+
+```{r, echo = TRUE} 
+library(stars)
+fn <- system.file("tif/L7_ETMs.tif", package = "stars")
+L7 <- read_stars(fn)
+L7
+```
+
+The bands can be operated on arithmetically, for example to generate a new object containing values of the normalized difference vegetation index through a function applied across the $x$ and $y$ spatial dimensions:
+
+```{r, echo = TRUE} 
+ndvi <- function(x) (x[4] - x[3])/(x[4] + x[3])
+(s2.ndvi <- st_apply(L7, c("x", "y"), ndvi))
+```
+
+The same file can also be accessed using the proxy mechanism, shich creates a link to the external entity, here a file:
+
+```{r, echo = TRUE} 
+L7p <- read_stars(fn, proxy=TRUE)
+L7p
+```
+
+The same function can also be applied across the same two spatial dimentions of the array, but no calculation is carried out until the data is needed and the output resolution known:
+
+```{r, echo = TRUE} 
+(L7p.ndvi = st_apply(L7p, c("x", "y"), ndvi))
+```
+
+The array object can also be split, here on the band dimension, to yield a representation as six rasters in list form:
+
+
+### gdalcubes 
+
+Earth Observation Data Cubes from Satellite Image Collections - extension of the **stars** proxy mechansim and the **raster** out-of-memory approach: (https://github.com/appelmar/gdalcubes_R).
+
+Processing collections of Earth observation images as on-demand multispectral, multitemporal data cubes. Users define cubes by spatiotemporal extent, resolution, and spatial reference system and let 'gdalcubes' automatically apply cropping, reprojection, and resampling using the 'Geospatial Data Abstraction Library' ('GDAL'). 
+
+Implemented functions on data cubes include reduction over space and time, applying arithmetic expressions on pixel band values, moving window aggregates over time, filtering by space, time, bands, and predicates on pixel values, materializing data cubes as 'netCDF' files, and plotting. User-defined 'R' functions can be applied over chunks of data cubes. The package implements lazy evaluation and multithreading. See also [a five month old blog post](https://www.r-spatial.org//r/2019/07/18/gdalcubes1.html).
+
+
+# Input/output
+
+The **sf**, **gdalcubes**, **lwgeom**, **rgdal** and **rgeos** packages crucially depend on external software, using GDAL for input and output:
+
+```{r, echo=TRUE}
+sf_extSoftVersion()
+```
+
+
+![](sf_deps.png)
+
+While **sp** handed off dependencies to interfaces to external software GEOS (**rgeos**) and GDAL+PROJ (**rgdal**), **sf** includes all the external dependencies itself. This also means that **stars** needs **sf** to provide raster drivers (some other packages like **gdalcubes** themselves link to GDAL).
+
+```{r}
+sort(as.character(st_drivers("vector")$name))
+```
+
+The drivers provided by GDAL can (mostly) read from data formatted as described for the drivers, and can to a lesser extent write data out. Raster access can use spatial subsets of the data extent, something that is harder to do with vector. Proxy handling is similarly largely restricted to raster drivers.
+
+```{r}
+sort(as.character(st_drivers("raster")$name))
+```
+
+There are clear preferences among data providers and users for particular data formats, so some drivers get more exposure than others. For vector data, many still use `"ESRI Shapefile"`, although its geometries are not SF-compliant, and data on features are stored in variant DBF files (text tiles, numerically imprecise, field name length restrictions, encoding issues). `"geojson"` and `"GML"` are text files with numeric imprecision in coordinates as well as data fields. Among vector drivers, `"GPKG"` is a viable standard and should be used as far as possible. This format is a file SQLite database, with multiple linked tables:
+
+```{r}
+library(RSQLite)
+db = dbConnect(SQLite(), dbname="snow/b_pump.gpkg")
+dbListTables(db)
+```
+
+The geometry column table has a clear structure:
+
+```{r}
+str(dbReadTable(db, "gpkg_geometry_columns"))
+```
+
+Reading the `"geom"` component yields a 2D point; in this case there is one feature only, with data in a BLOB: 
+
+```{r}
+str(dbReadTable(db, "b_pump")$geom)
+dbDisconnect(db)
+```
+
+We can query the layers in a `"GPKG"` data source: here the locations of the Broad Street pump and the other pumps in the Snow Soho Cholera epidemic data set:
+
+```{r}
+st_layers("snow/b_pump.gpkg")
+st_layers("snow/nb_pump.gpkg")
+```
+
+On the **sp** side, we could retrieve information about a data source, vector:
+
+```{r, warning=FALSE}
+library(rgdal)
+ogrInfo("snow/nb_pump.gpkg")
+```
+
+or raster:
+
+```{r, warning=FALSE}
+rgdal::GDALinfo(fn)
+```
+
+
+All of these facilities are taken from GDAL; the raster facilities have been extant for many years. **raster** used the ease of subsetting to permit large rasters to be handled out-of-memory.
+
+Summary: `sf::st_read()` and `rgdal::readOGR()` are equivalent, as are `sf::st_write()` and `rgdal::writeOGR()`. When writing, you may need to take steps if overwriting. `rgdal::readGDAL()` reads the raster data (sub)set into an **sp** object, `stars::read_stars()` reads into a possibly proxy **stars** object, and **raster** can also be used:
+
+```{r, warning=FALSE}
+library(raster)
+(r <- raster(fn))
+```
+
+
+Output: `rgdal::writeGDAL()`, `stars::write_stars()` or `raster::writeRaster()` may be used for writing, but what happens depends on details, such as storage formats. Unlike vector, most often storage formats will be taken as homogeneous by type.
+
+### Tiled representations
+
+While interactive web mapping interfaces use raster or vector tiled backgrounds, we have not (yet) approached tiles or pyramids internally.
+
+
+
+# Coordinate reference systems
+
+## Background
+
+The usefulness of spatial data is linked to knowing its coordinate reference system. The coordinate reference system may be geographic, usually measured in decimal degrees, or projected, layered on a known geographic CRS, usually measured in metres (planar). The underlying geographical CRS must specify an ellipsoid, with associated major and minor axis lengths:
+
+```{r}
+library(sp)
+library(rgdal)
+projInfo("ellps")[,c(1, 4)]
+```
+
+Other parameters should be specified, such as the prime meridian, often taken as Greenwich. Before PROJ version 6, legacy PROJ (and GDAL) used a `+datum=` tag introduced after the library migrated beyond USGS (around version 4.4). The underlying problem was not that projection and inverse projection could not be carried out between projected CRS and geograpghical CRS, but that national mapping agencies defined often many datums, keying the specification of a geographical CRS to a national or regional datum. Some of these, especially for North America, were supported, but support for others was patchy. The `+datum=` tag supported a partly informal listing of values, themselves linked to three or seven coefficient datum transformation sets, used through the `+towgs84=` tag. Coefficient lookup through the `+datum=` tag, or direct specification of coefficients through the `+towgs84=` tag became a convenient way to handle datum transformation in addition to projection and inverse projection.
+
+The default "hub" for transformation was to go through the then newly achieved WGS84 datum. Spatial data files often encoded the geographic and projected CRS with reference to these values, in some cases using PROJ 4 strings. These used a pseudo projection `+proj=longlat` to indicate a geographical CRS, and many other possible values of `+proj=` for projected CRS.
+
+The [Grids & Datums column](https://www.asprs.org/asprs-publications/grids-and-datums) in *Photogrammetric Engineering & Remote Sensing* gives insight into some of the peculiarities of national mapping agencies - authority is typically national but may be subnational:
+
+```{r}
+data("GridsDatums")
+GridsDatums[grep("Norway", GridsDatums$country),]
+```
+
+Beyond this, the database successively developed by the European Petroleum Survey Group was copied to local CSV files for PROJ and GDAL, providing lookup by code number. 
+
+```{r}
+EPSG <- make_EPSG()
+EPSG[grep("Oslo", EPSG$note), 1:2]
+```
+
+We can use `CRS()` to instantiate the coordinate reference system:
+
+```{r}
+(o <-CRS("+init=epsg:4817"))
+```
+
+The lookup prior to PROJ 6 used to provide a `+towgs84=` value of `278.3,93,474.5,7.889,0.05,-6.61,6.21`, but in the new regime only reveals transformation coefficients in the context of a coordinate operation (only in the unreleased development version of **rgdal**), and not from the PROJ string returned, which has only ballpark accuracy:
+
+
+```{r}
+list_coordOps("+proj=longlat +a=6377492.018 +rf=299.1528128 +pm=oslo +no_defs +type=crs", "EPSG:4326")
+```
+
+Using the database lookup but not exporting to a PROJ string gives reasonable accuracy:
+
+```{r}
+list_coordOps("EPSG:4817", "EPSG:4326")
+```
+
+Up to and including PROJ 5, downstream software, like **sf** and **rgdal**, have been able to rely on the provision of *ad-hoc* transformtion capabilities, with apparently predictable consequences. Everybody knew (or should have known) that each new release of the PROJ and GDAL CSV metadata files could update transformation coefficients enough to shift outcomes a little. Everyone further chose to ignore the timestamping of coordinates, or at least of datasets; we could guess (as above) that US Census tract boundaries for 1980 must use the NAD27 datum framework - suprisingly many used NAD83 anyway (both for Boston and the North Carolina SIDS data set).
+
+Use of KML files to provide zoom and pan for these boundaries, and now **leaflet** and **mapview** exposes approximations mercilessly. Use of coefficients of transformation of an unknown degree of approximation, and authority "googled it" was reaching its limits, or likely had exceeded them.
+
+**sp** classes used a PROJ string to define the CRS (in an S4 `"CRS"` object):
+
+```{r}
+getClass("CRS")
+```
+
+while **sf** uses an S3 `"crs"` object with an integer EPSG code and a PROJ string; if instantiated from the EPSG code, both are provided, here for now retaining the fragile `+towgs84=` key because the central OGRSpatialReference function `exportToProj4()` is not (yet) being called (it is called when reading from file):
+
+```{r}
+library(sf)
+st_crs(4326)
+```
+
+# Modernising PROJ and issues
+
+
+### PROJ
+
+Because so much open source (and other) software uses the PROJ library and framework, many are affected when PROJ upgrades. Until very recently, PROJ has been seen as very reliable, and the changes taking place now are intended to confirm and reinforce this reliability. Before PROJ 5 (PROJ 6 is out now, PROJ 7 is coming early in 2020), the `+datum=` tag was used, perhaps with `+towgs84=` with three or seven coefficients, and possibly `+nadgrids=` where datum transformation grids were available. However, transformations from one projection to another first inversed to longitude-latitude in WGS84, then projected on to the target projection.
+
+
+> Fast-forward 35 years and PROJ.4 is everywhere: It provides coordinate handling for almost every geospatial program, open or closed source. Today, we see a drastical  increase  in  the  need  for  high  accuracy  GNSS  coordinate  handling, especially in the agricultural and construction engineering sectors. This need for geodetic-accuracy transformations  is  not  satisfied  by "classic  PROJ.4". But with  the  ubiquity  of  PROJ.4,  we  can provide these transformations "everywhere", just by implementing them as part of PROJ.4 [@evers+knudsen17].
+
+
+### Escaping the WGS84 hub/pivot: PROJ and OGC WKT2
+
+
+Following the introduction of geodetic modules and pipelines in PROJ 5 [@knudsen+evers17; @evers+knudsen17], PROJ 6 moves further. Changes in the legacy PROJ representation and WGS84 transformation hub have been coordinated through the [GDAL barn raising](https://gdalbarn.com/) initiative. Crucially WGS84 often ceases to be the pivot for moving between datums. A new OGC WKT is coming, and an SQLite EPSG file database has replaced CSV files. SRS will begin to support 3D by default, adding time too as SRS change. See also [PROJ migration notes](https://proj.org/development/migration.html).
+
+There are very useful postings on the PROJ mailing list from Martin Desruisseaux, first [proposing clarifications](https://lists.osgeo.org/pipermail/proj/2019-July/008748.html) and a [follow-up](https://lists.osgeo.org/pipermail/proj/2019-August/008750.html) including a summary:
+
+> * "Early binding" ≈ hub transformation technique.
+
+> * "Late binding" ≈ hub transformation technique NOT used, replaced by
+a more complex technique consisting in searching parameters in the
+EPSG database after the transformation context (source, target,
+epoch, area of interest) is known.
+
+> * The problem of hub transformation technique is independent of WGS84.
+It is caused by the fact that transformations to/from the hub are
+approximate. Any other hub we could invent in replacement of WGS84
+will have the same problem, unless we can invent a hub for which
+transformations are exact (I think that if such hub existed, we
+would have already heard about it).
+
+> The solution proposed by ISO 19111 (in my understanding) is:
+
+> * Forget about hub (WGS84 or other), unless the simplicity of
+early-binding is considered more important than accuracy.
+
+> * Associating a CRS to a coordinate set (geometry or raster) is no
+longer sufficient. A {CRS, epoch} tuple must be associated. ISO
+19111 calls this tuple "Coordinate metadata". From a programmatic
+API point of view, this means that getCoordinateReferenceSystem()
+method in Geometry objects (for instance) needs to be replaced by a
+getCoordinateMetadata() method.
+
+
+
+### Upstream software dependencies of the R-spatial ecosystem
+
+When changes occur in upstream external software, R packages using these libraries often need to adapt, but package maintainers try very hard to shield users from any consequences, so that legacy workflows continue to provide the same or at least similar results from the same data. 
+
+The code shown in [@asdar1; @asdar2] is almost all run nightly on a platform with updated R packages and external software. 
+
+This does not necessarily trap all differences (figures are not compared), but is helpful in detecting impacts of changes in packages or external software. 
+
+It is also very helpful that CRAN servers using the released and development versions of R, and with different levels of external software also run nightly checks. 
+
+Again, sometimes changes are only noticed by users, but quite often checks run by maintainers and by CRAN alert us to impending challenges. 
+
+Tracking the development mailing lists of the external software communities, all open source, can also show how thinking is evolving, although sometimes code tidying in external software can have unexpected consequences, breaking not **sf** or **sp** with **rgdal** or **rgeos**, but a package further downstream. 
+
+[@bivand14] discusses open source geospatial software stacks more generally, but here we will consider ongoing changes in PROJ.
+
+[@knudsen+evers17; @evers+knudsen17] not only point out how the world has changed since a World Geodetic System of 1984 (WGS84) was adopted as a hub for coordinate transformation in PROJ, but also introduced transformation pipelines. 
+
+In using a transformation hub, PROJ had worked adequately when the errors introduced by transforming first to WGS84 and then from WGS84 to the target coordinate reference system, but with years passing from 1984, the world has undergone sufficient tectonic shifts for errors to increase. 
+
+In addition, the need for precision has risen in agriculture and engineering. 
+So PROJ, as it was, risked ceasing to be fit for purpose as a fundamental component of the geospatial open source software stack.
+
+Following major changes in successive iterations of the international standards for coordinate reference systems [@iso19111], PROJ is changing from preferring "late-binding" transformations, pivoting through a known transformation hub in going from input to target coordinate reference systems, to "early-binding" transformations. 
+
+This means that the user may be offered alternative paths from input to target coordinate reference systems, some of which may go directly, and more will use higher precision transformation grids, enlarging the existing practice of using North American Datum (NAD) grids. 
+
+In other cases, three or seven coefficient transformations may be offered, but the default fallback, where little is known about the input or target specification, may be less satisfactory than PROJ has previously offered.
+
+PROJ will also become more tightly linked to authorities responsible for the specification components. While the original well-known text (WKT1) descriptions also contained authorities, WKT2-2018 is substantially more stringent. PROJ continues to use the European Petroleum Survey Group (EPSG) database, the local copy PROJ uses is now an SQLite database, with a large number of tables:
+
+```{r, echo = TRUE, mysize=TRUE, size='\\tiny'} 
+library(RSQLite)
+db <- dbConnect(SQLite(), dbname="/usr/local/share/proj/proj.db")
+cat(strwrap(paste(dbListTables(db), collapse=", ")), sep="\n")
+dbDisconnect(db)
+```
+
+### Grid CDN mechanism
+
+Current discussions now relate to mechanisms for caching downloaded grids, and advertising their availability to all programs using PROJ, for example GRASS GIS or QGIS. 
+
+Up to now, PROJ metadata files have usually been stored in a directory with only read access for users. 
+
+New facilities have been added to add to the search path for PROJ metadata files, but downloading often bulky grid files on-the-fly is not seen as a sensible use of resources.
+
+### Transformation pipelines
+
+In addition, the current iteration of the standard makes it more important to declare the epoch of interest of coordinates (when the position was recorded and how) and the region of interest. 
+
+A transformation pathway may have an undefined epoch and a global span, but cannot achieve optimal precision everywhere. 
+
+By bounding the region of interest say within a tectonic plate, and the epoch to a given five-year period, very high precision transformations may be possible. 
+
+These choices have not so far been required explicitly, but for example matching against the `"area"` table in the database may reduce the number of transformation pathways offered dramatically.
+
+### CRS status before GDAL3 and PROJ6
+
+The initial use of coordinate reference systems for objects defined ib **sp** was based on the PROJ.4 string representation, which built on a simplified key=value form. 
+
+Keys began with plus (`+`), and the value format depended on the key. 
+
+If essential keys were missing, some might be added by default from a file that has now been eliminated as misleading; if `+ellps=` was missing and not added internally from other keys, `+ellps=WGS84` would be added silently.
+
+
+Accurate coordinate transformation has always been needed for the integration of data from different sources, but has become much more pressing as web mapping has become available in R, through the **leaflet** package [@leaflet-package], on which **mapview** and the `"view"` mode of **tmap**. 
+
+As web mapping provides zooming and panning, possible infelicities that were too small to detect as mismatches in transformation jump into prominence. 
+
+The web mapping workflow transforms input objects to EPSG:4326 (geographical CRS WGS 84, World area of relevance, WGS84 datum) as expected by **leaflet**, then on to EPSG:3857 (WGS 84 / Pseudo-Mercator) for display on web map backgrounds (this is carried out internally in **leaflet**. 
+
+
+
+We'll be using the Soho cholera data set; I converted the shapefiles from https://asdar-book.org/bundles2ed/die_bundle.zip to GPKG to be more modern (using `ogr2ogr` in GDAL 3 built against PROJ 6. **sf** is installed using the `proj.h` interface in PROJ 6:
+
+```{r, echo=TRUE}
+buildings <- sf::st_read("snow/buildings.gpkg", quiet=TRUE)
+st_crs(buildings)
+```
+
+To make an interactive display in `mapview()`, conversion/transformation to "Web Mercator" is needed - this uses a WGS84 datum. But PROJ 6 has dropped the `+datum=` tag, so the display is not correctly registered.
+
+```{r, echo=TRUE}
+library(mapview)
+mapview(buildings)
+```
+
+The CRS/SRS values in the GPKG file (it is a multi-table SQLite database) include the datum definition:
+
+```{r, echo=TRUE}
+library(RSQLite)
+db = dbConnect(SQLite(), dbname="snow/buildings.gpkg")
+dbReadTable(db, "gpkg_spatial_ref_sys")$definition[4]
+dbDisconnect(db)
+```
+
+Maybe using **rgdal** which is built using PROJ 6 but the legacy `proj_api.h` interface, and the shapefile as shipped with ASDAR reproduction materials will help?
+
+```{r, echo=TRUE}
+buildings1 <- rgdal::readOGR("snow/buildings.shp", verbose=FALSE)
+proj4string(buildings1)
+```
+
+No, same problem:
+
+```{r, echo=TRUE}
+mapview(buildings1)
+```
+
+But the shapefile has the datum definition:
+
+```{r, echo=TRUE, warning=FALSE}
+readLines("snow/buildings.prj")
+```
+
+There are a number of components to the PROJ/GDAL changes taking place. 
+
+One concerns the use of transformation pipelines to represent coordinate operations. These pipelines (there may be many candidates) vary by area of interest, accuracy of transformation coordinates if used, and the availability of grids.
+
+A second component concerns the representation of CRS; if CRS are represented by PROJ strings, and go through the GDAL function OGRSpatialReference `exportToProj4()`, most `+datum=` tags will be stripped ([see function documentation](https://gdal.org/doxygen/classOGRSpatialReference.html#a271b3de4caf844135b0c61e634860f2b)).
+
+A third component adds area of interest and possibly epoch to the WKT2_2018 version of ISO 19111 as a forward-looking text representation of a CRS.
+
+
+
+
+## Proposed developments (using **sp** and **rgdal** as prototypes)
+
+The current proposals now exposed in my fork of **sp** on github (>= 1.3-3) and the development version of **rgdal** on R-Forge involve the following steps, over and above backward compatibility (no change in handling CRS for PROJ < 6 and GDAL < 3; try to handle wrong case of GDAL < 3 with PROJ 6):
+
+For PROJ >= 6 && GDAL >= 3: supplement the `"CRS"` PROJ string with a full WKT2_2018 representation. If the object is instantiated by reading a file through GDAL, then `exportToProj4()` will degrade most CRS when creating a PROJ string. The WKT string is stored as a `comment()` to the `"CRS"` object, which is permissable but not desirable in an S4 context, but is backwards compatible. We can see that the WKT string represents the CRS seen in the vector file:
+
+```{r}
+comment(slot(buildings1, "proj4string"))
+```
+
+Using the previous direct instantiation mechanism, we see that the PROJ string is degraded
+
+```{r}
+(o <- CRS("+init=epsg:27700"))
+```
+
+but that the WKT2 payload is safe, and is actually better specified than that from file:
+
+```{r}
+comment(o)
+```
+
+The new `rgdal::showSRID()` function replaces the legacy `rgdal::showWKT()`, and is used internally in `rgdal::checkCRSArgs_ng(), which gets an additional argument to pass through a CRS string in a different format:
+
+```{r}
+cat(showSRID("+init=epsg:27700", multiline="YES"), "\n")
+```
+
+
+```{r}
+showSRID("+init=epsg:27700", "PROJ")
+```
+
+While previously `rgdal::checkCRSArgs()` was called by `sp::CRS()` and checked or expanded the PROJ string, in the GDAL >= 3 and PROJ >= 6 setting, the new function will use `rgdal::showSRID()` to provide both a checked PROJ string and a WKT2 string, which are then used to populate the `"CRS"` object and its comment. 
+
+```{r}
+checkCRSArgs_ng
+```
+
+Because `sp::CRS()` is called whenever an object is created, for example when reading from a file, newly instantiated `"Spatial"` objects should receive updated `"CRS"` objects with WKT2 comments. 
+
+The `"Spatial"` objects that will not receive updated `"CRS"` objects are those that have been serialized, as `"RDA"` or `"RDS"` objects, for example in package `data` directories, or for example from (https://gadm.org).
+
+```{r, echo=TRUE, eval=FALSE, cache=TRUE}
+download.file("https://biogeo.ucdavis.edu/data/gadm3.6/Rsp/gadm36_NOR_0_sp.rds", "gadm36_NOR_0_sp.rds")
+```
+
+```{r, echo=TRUE}
+nor <- readRDS("gadm36_NOR_0_sp.rds")
+proj4string(nor)
+comment(slot(nor, "proj4string"))
+```
+
+There is no automatic way to update these `"CRS"` objects, so user intervention will be needed to avoid possible degradation:
+
+```{r}
+(o <- CRS(proj4string(nor)))
+comment(o)
+```
+
+The new function `rgdal::list_coordOps()` can be used to explore what alternatives are returned on searching the `proj.db` database and the grids present on the running platform. If all we are using is the degraded PROJ string, we only find one ballpark alternative, leading to the mis-placement of buildings in Soho (**mapview** now converts all `"Spatial"` objects to their `sf` equivalents, so buildings1 is also mis-placed):
+
+```{r}
+(c0 <- list_coordOps(paste0(proj4string(buildings1), " +type=crs"), "EPSG:4326"))
+```
+
+If instead we use the WKT comment, we get 7 alternatives, with the best available having 2m accuracy. A 1m accuracy alternative could be available if a grid (URL given) is downloaded and installed (this will follow later).
+
+```{r}
+(c1 <- list_coordOps(comment(slot(buildings1, "proj4string")), "EPSG:4326"))
+```
+
+`rgdal::spTransform()` methods have been supplemented to use CRS comments if available, falling back on PROJ strings. The coordinate operation chosen (the best available on the running platform) is searched for and found once, and re-used for all the geometries in the object. The last coordinate operation used is also cached, but it would be up to the users to re-use this pipeline if desired (probably a class for pipeline objects is required):
+
+```{r}
+buildings1_ll <- spTransform(buildings1, CRS("+init=epsg:4326"))
+get(".last_coordOp", envir=rgdal:::.RGDAL_CACHE)
+```
+
+In these cases we have not so far been further confused by axis swapping - we do not yet know how this may affect workflows.
+
+Having transformed the building outlines using the CRS WKT comment, we have retrieved 2m accuracy:
+
+```{r}
+mapview(buildings1_ll)
+```
+
+Let's try the Broad Street pump itself: does the proposed solution deliver a work-around (and arguably a robust solution going forward)?
+
+```{r}
+bp <- readOGR("snow/b_pump.gpkg")
+comment(slot(bp, "proj4string"))
+```
+
+The untreated view (coercion to **sf** (0.8-0, not wkt2 branch)  ignoring CRS comment then ballpark transformation to 4326 before internal conversion to pseudo-Mercator):
+
+```{r}
+mapview(bp)
+```
+
+If we transform using the CRS WKT comment, we retrieve the pre-PROJ6/GDAL3 position, but can sharpen this if we download and use a higher precision grid:
+
+```{r}
+mapview(spTransform(bp, CRS("+init=epsg:4326")))
+```
+
+Last week we saw the first case in the wild of axis swapping (some CRS are defined by relevant authorities as latitude, longitude).
+
+A further problem is that packages like **raster** and **mapview** use verbatim PROJ strings to check CRS equivalence. This has not been resolved.
+
