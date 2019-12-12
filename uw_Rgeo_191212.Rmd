@@ -36,6 +36,8 @@ needed <- c("raster", "rgdal", "RSQLite", "stars", "abind", "sp", "mapview",
 
 Script and data at https://github.com/rsbivand/uw_191212/raw/master/uw_Rgeo_191212.zip. Download to suitable location, unzip and use as basis.
 
+Script with local examples:  https://github.com/rsbivand/uw_191212/raw/master/thurs191212.R
+
 ## Preface/positionality
 
 I am afraid that this talk will not contain many graphical elements. Why is this? Text is processed by different parts of our cognitive systems than images, which open for many more mis-understandings. Text is generally a more direct channel of communication.

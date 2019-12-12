@@ -3,6 +3,6 @@
 ### Thursday 12 December 2019, 16:45-18:45, sala 108
 
 
-
+updated with local examples
 ...
 
